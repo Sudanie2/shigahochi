@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -24,13 +25,13 @@ jobs:
       - name: Generate RSS
         run: python scripts/generate_rss.py
 
-      - name: "Debug: Workspace files"
+      - name: Debug: Workspace files
         run: |
           echo "=== Workspace files ==="
           ls -R .
 
       - name: Upload rss.xml as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: rss-xml
           path: rss.xml
