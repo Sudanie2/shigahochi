@@ -1,9 +1,8 @@
-# .github/workflows/rss.yml
 name: Generate RSS
 
 on:
   schedule:
-    - cron:  '0 21 * * *'   # 毎日 JST 6:00 (UTC 21:00)
+    - cron: '0 21 * * *'    # UTC 21:00 = JST 6:00
   workflow_dispatch:
 
 jobs:
@@ -11,7 +10,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -22,8 +22,7 @@ jobs:
         run: pip install requests beautifulsoup4
 
       - name: Generate RSS
-        run: |
-          python scripts/generate_rss.py
+        run: python scripts/generate_rss.py
 
       - name: Debug: ワークスペースファイル一覧
         run: |
