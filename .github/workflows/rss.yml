@@ -1,21 +1,37 @@
+# .github/workflows/rss.yml
 name: Generate RSS
 
 on:
   schedule:
-    - cron: '0 21 * * *'  # JST 午前6時
+    - cron:  '0 21 * * *'   # 毎日 JST 6:00 (UTC 21:00)
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.x'
-      - run: pip install requests beautifulsoup4
-      - run: python scripts/generate_rss.py
-      - run: |
+
+      - name: Install deps
+        run: pip install requests beautifulsoup4
+
+      - name: Generate RSS
+        run: |
+          python scripts/generate_rss.py
+
+      - name: Debug: ワークスペースファイル一覧
+        run: |
+          echo "=== Workspace files ==="
+          ls -R .
+
+      - name: Commit & Push
+        run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git add rss.xml
