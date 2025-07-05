@@ -15,7 +15,8 @@ ET.SubElement(channel, "link").text = URL
 ET.SubElement(channel, "description").text = "毎朝自動生成されるフィード"
 
 for dd in soup.select("dd.text2"):
-    dt_elem = dd.find_previous_sibling("dt")
+    # 修正：find_previous で <dt> を取得
+    dt_elem = dd.find_previous("dt")
     a = dt_elem.find("a")
     title = a.get_text(strip=True)
     href = a["href"]
