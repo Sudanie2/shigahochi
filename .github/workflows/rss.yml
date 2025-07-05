@@ -3,7 +3,7 @@ name: Generate RSS
 on:
   schedule:
     - cron: '0 21 * * *'    # UTC 21:00 = JST 6:00
-  workflow_dispatch: {}     # ← 空オブジェクトとして定義
+  workflow_dispatch: {}     # 空マッピングで定義
 
 jobs:
   build:
@@ -18,13 +18,13 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install deps
+      - name: Install dependencies
         run: pip install requests beautifulsoup4
 
       - name: Generate RSS
         run: python scripts/generate_rss.py
 
-      - name: Debug: ワークスペースファイル一覧
+      - name: Debug: Workspace files
         run: |
           echo "=== Workspace files ==="
           ls -R .
