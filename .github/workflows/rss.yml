@@ -25,7 +25,7 @@ jobs:
       - name: Generate RSS
         run: python scripts/generate_rss.py
 
-      - name: Debug: Workspace files
+      - name: "Debug: Workspace files"
         run: |
           echo "=== Workspace files ==="
           ls -R .
