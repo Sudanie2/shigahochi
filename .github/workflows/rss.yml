@@ -3,7 +3,7 @@ name: Generate RSS
 on:
   schedule:
     - cron: '0 21 * * *'    # UTC 21:00 = JST 6:00
-  workflow_dispatch:
+  workflow_dispatch: {}     # ← 空オブジェクトとして定義
 
 jobs:
   build:
