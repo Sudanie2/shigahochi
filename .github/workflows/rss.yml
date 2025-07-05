@@ -1,34 +1,33 @@
-name: Generate RSS
+name: Generate RSS Feed
 
 on:
   schedule:
-    - cron: '0 21 * * *'    # UTC 21:00 = JST 6:00
-  workflow_dispatch: {}     # 空マッピングで定義
+    - cron: '0 21 * * *'  # UTC 21:00 = JST 6:00
+  workflow_dispatch: {}  # 空マッピングで定義
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-
+        
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
-
+          
       - name: Install dependencies
         run: pip install requests beautifulsoup4
-
+        
       - name: Generate RSS
         run: python scripts/generate_rss.py
-
-      - name: Debug: Workspace files
+        
+      - name: "Debug: Workspace files"
         run: |
           echo "=== Workspace files ==="
           ls -R .
-
+          
       - name: Commit & Push
         run: |
           git config user.name 'github-actions[bot]'
