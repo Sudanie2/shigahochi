@@ -1,4 +1,3 @@
-# scripts/generate_rss.py
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -24,8 +23,7 @@ for dd in soup.select("dd.text2"):
     item = ET.SubElement(channel, "item")
     ET.SubElement(item, "title").text = title
     ET.SubElement(item, "link").text = link
-    date_text = dd.get_text().split("｜")[0].strip()
-    # 例: "7月5日"
+    date_text = dd.get_text().split("｜")[0].strip()  # 例: "7月5日"
     dt = datetime.strptime(f"{datetime.now().year}年{date_text}", "%Y年%m月%d日")
     ET.SubElement(item, "pubDate").text = dt.strftime("%a, %d %b %Y 00:00:00 +0900")
 
