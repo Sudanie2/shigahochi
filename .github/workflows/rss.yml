@@ -1,46 +1,76 @@
-# .github/workflows/rss.yml
 name: Generate RSS Feed
 
 on:
   schedule:
-    - cron: '0 21 * * *'  # UTC 21:00 = JST 6:00
-  workflow_dispatch: {}
+    - cron: '10 1 * * *'  # JST 10:10 毎日実行
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade requests beautifulsoup4
 
-      - name: Install dependencies
-        run: pip install requests beautifulsoup4
-
-      - name: Generate RSS
-        run: python scripts/generate_rss.py
-
-      - name: "Debug: Workspace files"
+      - name: Build RSS from Shigahochi
         run: |
-          echo "=== Workspace files ==="
-          ls -R .
+          python <<'PY'
+          import requests, datetime, email.utils, pathlib, html
+          from bs4 import BeautifulSoup
 
-      - name: Upload rss.xml as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: rss-xml
-          path: rss.xml
+          BASE_URL = "http://www.shigahochi.co.jp/"
+          TOP_URL = BASE_URL
+          now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
+          last_build = email.utils.format_datetime(now)
 
-      - name: Commit & Push
-        if: always()
+          # 取得
+          r = requests.get(TOP_URL, timeout=20)
+          r.encoding = 'shift_jis'
+          soup = BeautifulSoup(r.text, "html.parser")
+
+          # 記事リンクを抽出
+          items = []
+          for a in soup.select("p.sp-caption-txt1 a"):
+              title = a.get_text(strip=True)
+              link = a["href"]
+              if not link.startswith("http"):
+                  link = BASE_URL + link.lstrip("./")
+              pub = email.utils.format_datetime(now)
+              items.append(
+                  f"<item><title>{html.escape(title)}</title><link>{link}</link><guid>{link}</guid><pubDate>{pub}</pubDate></item>"
+              )
+
+          if not items:
+              print("WARNING: RSSアイテムが見つかりません。rss.xmlを生成しません。")
+              exit(0)
+
+          rss = (
+              '<?xml version="1.0" encoding="UTF-8"?>\n'
+              '<rss version="2.0">\n<channel>\n'
+              '<title>滋賀報知新聞 新着記事</title>\n'
+              f'<link>{TOP_URL}</link>\n'
+              '<description>滋賀報知新聞トップページの新着記事をRSS配信</description>\n'
+              f'<lastBuildDate>{last_build}</lastBuildDate>\n'
+              + "\n".join(items) +
+              '\n</channel>\n</rss>'
+          )
+
+          pathlib.Path("rss.xml").write_text(rss, encoding="utf-8")
+          print("[DEBUG] rss.xml written")
+          PY
+
+      - name: Commit & push if changed
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          if [ ! -f rss.xml ]; then
+            echo "rss.xml not found. Nothing to commit. Exiting *successfully*."
+            exit 0
+          fi
+
+          git config --global user.name github-actions
+          git config --global user.email github-actions@github.com
           git add rss.xml
-          git diff --quiet || git commit -m 'Update rss.xml'
+          git commit -m "Update Shigahochi RSS" || echo "Nothing to commit"
           git push
