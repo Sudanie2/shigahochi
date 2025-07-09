@@ -1,34 +1,42 @@
---- scripts/generate_rss.py
-+++ scripts/generate_rss.py
-@@
-- for dd in soup.select("dd.text2"):
--    # 修正：find_previous で <dt> を取得
--    dt_elem = dd.find_previous("dt")
--    a = dt_elem.find("a")
--    title = a.get_text(strip=True)
--    href = a["href"]
--    link = href if href.startswith("http") else "http://www.shigahochi.co.jp/" + href
--
--    item = ET.SubElement(channel, "item")
--    ET.SubElement(item, "title").text = title
--    ET.SubElement(item, "link").text = link
--
--    date_text = dd.get_text().split("｜")[0].strip()  # 例: "7月5日"
--    dt = datetime.strptime(f"{datetime.now().year}年{date_text}", "%Y年%m月%d日")
--    ET.SubElement(item, "pubDate").text = dt.strftime("%a, %d %b %Y 00:00:00 +0900")
-+ # 「トップニュース」スライダーから取得
-+ for slide in soup.select("div.sp-slide"):
-+     a = slide.select_one(".sp-caption-txt1 a")
-+     title = a.get_text(strip=True)
-+     href  = a["href"]
-+     link  = href if href.startswith("http") else "http://www.shigahochi.co.jp/" + href
-+
-+     date_txt = slide.select_one(".sp-caption-txt3").get_text()  # 例: "(東近江・湖東 ニュース 7月5日)"
-+     # 最後の「月日」を抜き出す
-+     m = date_txt.strip("()").split()[-1]
-+     dt = datetime.strptime(f"{datetime.now().year}年{m}", "%Y年%m月%d日")
-+
-+     item = ET.SubElement(channel, "item")
-+     ET.SubElement(item, "title").text   = title
-+     ET.SubElement(item, "link").text    = link
-+     ET.SubElement(item, "pubDate").text = dt.strftime("%a, %d %b %Y 00:00:00 +0900")
+import requests, datetime, email.utils, pathlib, html
+from bs4 import BeautifulSoup
+
+BASE_URL = "http://www.shigahochi.co.jp/"
+TOP_URL = BASE_URL
+now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
+last_build = email.utils.format_datetime(now)
+
+# 取得
+r = requests.get(TOP_URL, timeout=20)
+r.encoding = 'shift_jis'
+soup = BeautifulSoup(r.text, "lxml")
+
+# 記事リンクを抽出
+items = []
+for a in soup.select("p.sp-caption-txt1 a"):
+    title = a.get_text(strip=True)
+    link = a["href"]
+    if not link.startswith("http"):
+        link = BASE_URL + link.lstrip("./")
+    pub = email.utils.format_datetime(now)
+    items.append(
+        f"<item><title>{html.escape(title)}</title><link>{link}</link><guid>{link}</guid><pubDate>{pub}</pubDate></item>"
+    )
+
+if not items:
+    print("WARNING: RSSアイテムが見つかりません。rss.xmlを生成しません。")
+    exit(0)
+
+rss = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+    '<rss version="2.0">\n<channel>\n'
+    '<title>滋賀報知新聞 新着記事</title>\n'
+    f'<link>{TOP_URL}</link>\n'
+    '<description>滋賀報知新聞トップページの新着記事をRSS配信</description>\n'
+    f'<lastBuildDate>{last_build}</lastBuildDate>\n'
+    + "\n".join(items) +
+    '\n</channel>\n</rss>'
+)
+
+pathlib.Path("rss.xml").write_text(rss, encoding="utf-8")
+print("[DEBUG] rss.xml written")
