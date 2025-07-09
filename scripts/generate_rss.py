@@ -9,7 +9,7 @@ last_build = email.utils.format_datetime(now)
 # 取得
 r = requests.get(TOP_URL, timeout=20)
 r.encoding = 'shift_jis'
-soup = BeautifulSoup(r.text, "lxml")
+soup = BeautifulSoup(r.text, "html.parser")  # ← lxml → html.parser に変更！
 
 # 記事リンクを抽出
 items = []
