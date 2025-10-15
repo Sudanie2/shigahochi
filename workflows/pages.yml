@@ -1,0 +1,114 @@
+name: shigahochi RSS → GitHub Pages (single)
+
+on:
+  schedule:
+    - cron: "0 * * * *"   # 毎時
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      docs-path: docs
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate feed.xml (stdlib only)
+        run: |
+          python - <<'PY'
+          import os, re, sys
+          from datetime import datetime, timezone, timedelta
+          from urllib.parse import urljoin
+          from urllib.request import Request, urlopen
+          from email.utils import format_datetime
+          import xml.etree.ElementTree as ET
+
+          BASE = "https://www.shigahochi.co.jp/"
+          LIST_URL = "https://www.shigahochi.co.jp/search.php?run=true&type=article"
+          OUT_PATH = "docs/feed.xml"
+          JST = timezone(timedelta(hours=9))
+
+          def fetch(url: str) -> str:
+            req = Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; shigahochi-rss/1.0)"})
+            with urlopen(req, timeout=30) as r:
+              return r.read().decode("utf-8", errors="ignore")
+
+          def strip_tags(s: str) -> str:
+            return re.sub(r"<[^>]+>", "", s).strip()
+
+          def extract_items(html: str):
+            items, seen = [], set()
+            pat = re.compile(r'<a\s+[^>]*href=["\']([^"\']*info\.php\?id=\d+)[^"\']*["\'][^>]*>(.*?)</a>', re.I|re.S)
+            for m in pat.finditer(html):
+              href, inner = m.group(1), m.group(2)
+              url = urljoin(BASE, href)
+              if url in seen: 
+                continue
+              seen.add(url)
+              title = strip_tags(inner) or "（無題）"
+              # 近傍から YYYY年MM月DD日
+              s, e = m.span()
+              window = html[max(0, s-200):min(len(html), e+200)]
+              dm = re.search(r'(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日', window)
+              if dm:
+                y, mo, d = map(int, dm.groups())
+                pub = datetime(y, mo, d, 0, 0, 0, tzinfo=JST)
+              else:
+                pub = datetime.now(JST)
+              items.append({"title": title, "url": url, "pub": pub})
+            items.sort(key=lambda x: x["pub"], reverse=True)
+            return items[:80]
+
+          def build_rss(items):
+            os.makedirs("docs", exist_ok=True)
+            open("docs/.nojekyll", "w").close()
+            rss = ET.Element("rss", attrib={"version": "2.0"})
+            channel = ET.SubElement(rss, "channel")
+            now = datetime.now(JST)
+            def add(tag, text):
+              el = ET.SubElement(channel, tag); el.text = text; return el
+            add("title", "滋賀報知新聞（非公式・新着）")
+            add("link", BASE)
+            add("description", "滋賀報知新聞の新着（スクレイピング生成・非公式）")
+            add("language", "ja")
+            add("lastBuildDate", format_datetime(now))
+            for it in items:
+              item = ET.SubElement(channel, "item")
+              ET.SubElement(item, "title").text = it["title"]
+              ET.SubElement(item, "link").text  = it["url"]
+              ET.SubElement(item, "guid").text  = it["url"]
+              ET.SubElement(item, "pubDate").text = format_datetime(it["pub"])
+            ET.indent(rss)
+            ET.ElementTree(rss).write(OUT_PATH, encoding="utf-8", xml_declaration=True)
+
+          html = fetch(LIST_URL)
+          items = extract_items(html)
+          if not items:
+            print("no items found", file=sys.stderr); sys.exit(1)
+          build_rss(items)
+          print("ok")
+          PY
+
+      - name: Upload artifact (docs)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
